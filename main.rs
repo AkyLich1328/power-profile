@@ -1,6 +1,7 @@
 ////////////////////////////////////
 use clap::ValueEnum;
 use clap::{Parser, Subcommand};
+use std::fmt::Display;
 use std::{io, path::PathBuf};
 use tokio::time::{Duration, sleep};
 ////////////////////////////////////
@@ -220,14 +221,17 @@ async fn get_battery_info() -> Result<BatteryInfo, std::io::Error> {
 async fn print_battery_info() {
     match get_battery_info().await {
         Ok(info) => {
-            println!("Профиль: {}", info.profile.as_str());
-            println!("Статус: {}", info.status);
-            println!("Заряд: {}%", info.capacity);
-            println!("Износ: {:.2}%", info.wear);
+            log_msg(format!(
+                "Профиль: {}\nСтатус: {}\nЗаряд: {}%\nИзнос: {:.2}%",
+                info.profile.as_str(),
+                info.status,
+                info.capacity,
+                info.wear
+            ));
         }
 
         Err(e) => {
-            println!("Ошибка: {}", e);
+            log_msg(format!("Ошибка: {}", e));
         }
     }
 }
@@ -271,17 +275,29 @@ async fn get_cpu_temperature(temp_path: &std::path::Path) -> Result<f32, io::Err
     Ok(temp / 1000.0)
 }
 
+fn log_msg(message: impl Display) {
+    let now = chrono::Local::now();
+    println!(
+        "[{}] Power-Profile - {}",
+        now.format("%Y-%m-%d %H:%M:%S"),
+        message
+    );
+}
+
 //Главный поток
 async fn auto_profile_worker() {
     println!("Начало работы автоматической системы профилей батареи...");
     //Получение температуры процессора по термальной зоне
     let cpu_temp_path = match find_cpu_temp_path() {
         Ok(path) => {
-            println!("Термальная зона процессора найдена: {}", path.display());
+            log_msg(format!(
+                "Термальная зона процессора найдена: {}",
+                path.display()
+            ));
             Some(path)
         }
         Err(e) => {
-            println!("Не удалось найти x86_pkg_temp: {}", e);
+            log_msg(format!("Не удалось найти x86_pkg_temp: {}", e));
             None
         }
     };
@@ -289,7 +305,7 @@ async fn auto_profile_worker() {
     loop {
         tokio::select! {
            _ = tokio::signal::ctrl_c() => {
-               println!("\nЗавершение daemon...");
+                log_msg("Завершение работы");
                break;
            }
 
@@ -298,7 +314,7 @@ async fn auto_profile_worker() {
                 let status = match get_status().await {
                     Ok(s) => s,
                     Err(e) => {
-                        println!("Ошибка статуса: {}", e);
+                        log_msg(format!("Ошибка статуса: {}", e));
                         continue;
                     }
                 };
@@ -306,7 +322,7 @@ async fn auto_profile_worker() {
                 let capacity = match get_capacity().await {
                     Ok(c) => c,
                     Err(e) => {
-                        println!("Ошибка заряда: {}", e);
+                        log_msg(format!("Ошибка заряда: {}", e));
                         continue;
                     }
                 };
@@ -316,31 +332,45 @@ async fn auto_profile_worker() {
                     Some(path) => match get_cpu_temperature(path).await {
                         Ok(temp) => Some(temp),
                         Err(e) => {
-                            println!("Ошибка чтения температуры CPU: {}", e);
+                            log_msg(format!("Ошибка чтения температуры CPU: {}", e));
                             None
                         }
                     },
                     None => None,
                 };
 
-                let target_profile =
+                let (target_profile, reason) =
                     //если температура процессора больше или равна 85% или заряд батареи
                     //меньше или равен 25 то ставим профиль PowerSaver
-                    if cpu_temp.is_some_and(|temp| temp >= 85.0)
-                        || capacity <= 25 {
-                        BatteryPowerProfile::PowerSaver
+                    if cpu_temp.is_some_and(|temp| temp >= 85.0) || capacity <= 25 {
+                        (
+                            BatteryPowerProfile::PowerSaver,
+                            "Температура CPU => 85°C или заряд батареи <= 25%",
+                        )
                     } else {
                         match status {
                         //если работает от зарядки
-                        BatteryChargeStatus::Charging => BatteryPowerProfile::Performance,
+                        BatteryChargeStatus::Charging => (
+                            BatteryPowerProfile::Performance,
+                            "Работает от зарядки"
+                        ),
                         //если работает от батареи
-                        BatteryChargeStatus::Discharging => BatteryPowerProfile::Balanced,
+                        BatteryChargeStatus::Discharging => (
+                            BatteryPowerProfile::Balanced,
+                                "Работает от батареи",
+                        ),
                         //если батарея заряженна полностью
-                        BatteryChargeStatus::Full => BatteryPowerProfile::Performance,
+                        BatteryChargeStatus::Full => (
+                            BatteryPowerProfile::Performance,
+                                "Батарея заряженна полностью",
+                        ),
                         //Если неисзвестно состояние батареи
                         //забавное наблюдение, когда стоит ограничение на зарядку 95%
                         //то когда батарея будет на этом уровне зарядки то будет Unknown
-                        BatteryChargeStatus::Unknown => BatteryPowerProfile::Balanced,
+                        BatteryChargeStatus::Unknown => (
+                            BatteryPowerProfile::Balanced,
+                                "Неизсветное состояние батареи",
+                        ),
                     }
                 };
 
@@ -349,7 +379,7 @@ async fn auto_profile_worker() {
                     Ok(profile) => profile,
 
                     Err(e) => {
-                        println!("Ошибка получения профиля: {}", e);
+                        log_msg(format!("Ошибка получения профиля: {}", e));
 
                         continue;
                     }
@@ -357,13 +387,21 @@ async fn auto_profile_worker() {
 
 
                 if current_profile != target_profile {
+
+                    log_msg(format!(
+                        "Смена профиля: {} -> {} ({})",
+                        current_profile.as_str(),
+                        target_profile.as_str(),
+                        reason
+                    ));
+
                     match set_profile(target_profile).await {
                         Ok(_) => {
-                            println!("Установлен профиль: {}", target_profile.as_str());
+                            log_msg(format!("Установлен профиль: {}", target_profile.as_str()));
                         }
 
                         Err(e) => {
-                            println!("Ошибка установки: {}", e);
+                            log_msg(format!("Ошибка установки: {}", e));
                         }
                     }
                 }
@@ -387,11 +425,9 @@ async fn main() -> Result<(), std::io::Error> {
 
         Commands::Set { profile } => {
             set_profile(profile).await?;
-            println!("Установлен профиль: {}", profile.as_str());
+            log_msg(format!("Установлен профиль: {}", profile.as_str()));
         }
     }
-
-    println!("==========");
 
     Ok(())
 }
