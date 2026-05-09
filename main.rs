@@ -286,17 +286,6 @@ async fn auto_profile_worker() {
         }
     };
 
-    //Получение текущего профиля
-    let mut current_profile = match get_profile().await {
-        Ok(profile) => profile,
-
-        Err(e) => {
-            println!("Ошибка получения профиля: {}", e);
-
-            BatteryPowerProfile::Balanced
-        }
-    };
-
     loop {
         tokio::select! {
            _ = tokio::signal::ctrl_c() => {
@@ -355,12 +344,22 @@ async fn auto_profile_worker() {
                     }
                 };
 
+                //Получение текущего профиля
+                let current_profile = match get_profile().await {
+                    Ok(profile) => profile,
+
+                    Err(e) => {
+                        println!("Ошибка получения профиля: {}", e);
+
+                        continue;
+                    }
+                };
+
+
                 if current_profile != target_profile {
                     match set_profile(target_profile).await {
                         Ok(_) => {
                             println!("Установлен профиль: {}", target_profile.as_str());
-
-                            current_profile = target_profile;
                         }
 
                         Err(e) => {
