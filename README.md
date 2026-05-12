@@ -6,7 +6,8 @@
 
 Конфиг файл находится в : /etc/power-profile/config.json
 
-<img width="1594" height="900" alt="image" src="https://github.com/user-attachments/assets/4e459930-b65c-4df5-93a9-fbebcd2bf775" />
+<img width="1598" height="900" alt="image" src="https://github.com/user-attachments/assets/b8f745f1-f3cc-4eef-bccc-64abee753f70" />
+
 
 Зависимости у программы:
 ```
