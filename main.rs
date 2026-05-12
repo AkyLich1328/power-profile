@@ -1,10 +1,62 @@
 ////////////////////////////////////
 use clap::ValueEnum;
 use clap::{Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+use std::fs;
 use std::{io, path::PathBuf};
 use tokio::time::{Duration, sleep};
 ////////////////////////////////////
+
+//Для конфига
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    low_battery_threshold: u8,
+    high_temperature_threshold: f32,
+    charging_profile: BatteryPowerProfile,
+    battery_profile: BatteryPowerProfile,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            low_battery_threshold: 25,
+            high_temperature_threshold: 85.0,
+            charging_profile: BatteryPowerProfile::Performance,
+            battery_profile: BatteryPowerProfile::PowerSaver,
+        }
+    }
+}
+
+fn load_config(path: &str) -> Result<Config, std::io::Error> {
+    let contents = fs::read_to_string(path)?;
+    let config: Config = serde_json::from_str(&contents).map_err(io::Error::other)?;
+
+    Ok(config)
+}
+
+fn save_config(path: &str, config: &Config) -> Result<(), io::Error> {
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let json = serde_json::to_string_pretty(config).map_err(io::Error::other)?;
+
+    fs::write(path, json)?;
+    Ok(())
+}
+
+fn load_or_create_config(path: &str) -> Result<Config, io::Error> {
+    match load_config(path) {
+        Ok(config) => Ok(config),
+
+        Err(_) => {
+            let config = Config::default();
+            save_config(path, &config)?;
+            Ok(config)
+        }
+    }
+}
 
 //Для удобного управления аргументами в терминале
 #[derive(Parser)]
@@ -25,10 +77,13 @@ enum Commands {
 /////////////////////////////////////////////
 
 //Для профилей
-#[derive(Debug, Clone, Copy, PartialEq, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, ValueEnum, Serialize, Deserialize)]
 enum BatteryPowerProfile {
-    PowerSaver,  //Профиль максимальной автономности
-    Balanced,    //Профиль баланса
+    #[serde(rename = "power-saver")]
+    PowerSaver, //Профиль максимальной автономности
+    #[serde(rename = "balanced")]
+    Balanced, //Профиль баланса
+    #[serde(rename = "performance")]
     Performance, //Профиль максимальной производительности
 }
 
@@ -130,6 +185,8 @@ async fn get_profile() -> Result<BatteryPowerProfile, std::io::Error> {
 
     BatteryPowerProfile::from_str(&profile_str).ok_or(std::io::Error::other("Неизвестный профиль"))
 }
+
+/////////////////////////////////////////
 
 //Функция поиска директории которая отвечает за информацию о батареи
 fn find_battery_path() -> Result<PathBuf, io::Error> {
@@ -236,6 +293,7 @@ async fn print_battery_info() {
     }
 }
 
+///////////////////////////////////////////
 /// Ищет thermal zone с типом x86_pkg_temp
 fn find_cpu_temp_path() -> Result<PathBuf, io::Error> {
     for entry in std::fs::read_dir("/sys/class/thermal")? {
@@ -274,7 +332,9 @@ async fn get_cpu_temperature(temp_path: &std::path::Path) -> Result<f32, io::Err
 
     Ok(temp / 1000.0)
 }
+/////////////////////////////////////
 
+//Функция логирования
 fn log_msg(message: impl Display) {
     let now = chrono::Local::now();
     println!(
@@ -299,6 +359,14 @@ async fn auto_profile_worker() {
         Err(e) => {
             log_msg(format!("Не удалось найти x86_pkg_temp: {}", e));
             None
+        }
+    };
+
+    let config = match load_or_create_config("/etc/power-profile/config.json") {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            log_msg(format!("Ошибка чтения конфига: {}", e));
+            Config::default()
         }
     };
 
@@ -342,7 +410,7 @@ async fn auto_profile_worker() {
                 let (target_profile, reason) =
                     //если температура процессора больше или равна 85% или заряд батареи
                     //меньше или равен 25 то ставим профиль PowerSaver
-                    if cpu_temp.is_some_and(|temp| temp >= 85.0) || capacity <= 25 {
+                    if cpu_temp.is_some_and(|temp| temp >= config.high_temperature_threshold) || capacity <= config.low_battery_threshold {
                         (
                             BatteryPowerProfile::PowerSaver,
                             "Температура CPU => 85°C или заряд батареи <= 25%",
@@ -351,12 +419,12 @@ async fn auto_profile_worker() {
                         match status {
                         //если работает от зарядки
                         BatteryChargeStatus::Charging => (
-                            BatteryPowerProfile::Performance,
+                            config.charging_profile,
                             "Работает от зарядки"
                         ),
                         //если работает от батареи
                         BatteryChargeStatus::Discharging => (
-                            BatteryPowerProfile::Balanced,
+                            config.battery_profile,
                                 "Работает от батареи",
                         ),
                         //если батарея заряженна полностью
