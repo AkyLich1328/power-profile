@@ -8,3 +8,7 @@
 
 <img width="1594" height="900" alt="image" src="https://github.com/user-attachments/assets/4e459930-b65c-4df5-93a9-fbebcd2bf775" />
 
+Зависимости у программы:
+
+sudo pacman -S power-profiles-daemon
+sudo systemctl enable --now power-profiles-daemon
