@@ -15,6 +15,8 @@ struct Config {
     high_temperature_threshold: f32,
     charging_profile: BatteryPowerProfile,
     battery_profile: BatteryPowerProfile,
+    enable_charge_limit: bool,
+    charge_limit: u8,
 }
 
 impl Default for Config {
@@ -24,6 +26,8 @@ impl Default for Config {
             high_temperature_threshold: 85.0,
             charging_profile: BatteryPowerProfile::Performance,
             battery_profile: BatteryPowerProfile::PowerSaver,
+            enable_charge_limit: false,
+            charge_limit: 85,
         }
     }
 }
@@ -49,7 +53,6 @@ fn save_config(path: &str, config: &Config) -> Result<(), io::Error> {
 fn load_or_create_config(path: &str) -> Result<Config, io::Error> {
     match load_config(path) {
         Ok(config) => Ok(config),
-
         Err(_) => {
             let config = Config::default();
             save_config(path, &config)?;
@@ -266,6 +269,7 @@ async fn get_capacity() -> Result<u8, std::io::Error> {
     Ok(capacity)
 }
 
+//Получение информации о батареи
 async fn get_battery_info() -> Result<BatteryInfo, std::io::Error> {
     Ok(BatteryInfo {
         profile: get_profile().await?,
@@ -275,6 +279,7 @@ async fn get_battery_info() -> Result<BatteryInfo, std::io::Error> {
     })
 }
 
+//Вывод информации о батареи
 async fn print_battery_info() {
     match get_battery_info().await {
         Ok(info) => {
@@ -291,6 +296,37 @@ async fn print_battery_info() {
             log_msg(format!("Ошибка: {}", e));
         }
     }
+}
+
+//установка лимита зарядки
+fn set_charge_limit(limit: u8) -> Result<(), std::io::Error> {
+    if !(50..=100).contains(&limit) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Лимит должен быть в диапазоне от 50 до 100",
+        ));
+    }
+
+    let battery_path = find_battery_path()?;
+
+    let candidates = [
+        "charge_control_end_threshold", // ThinkPad, ASUS, Dell
+        "charge_stop_threshold",        // Некоторые ASUS
+    ];
+
+    for file in candidates {
+        let path = battery_path.join(file);
+
+        if path.exists() {
+            std::fs::write(&path, limit.to_string())?;
+            return Ok(());
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "Этот ноутбук не поддерживает лимит зарядки",
+    ))
 }
 
 ///////////////////////////////////////////
@@ -369,6 +405,22 @@ async fn auto_profile_worker() {
             Config::default()
         }
     };
+
+    if config.enable_charge_limit {
+        match set_charge_limit(config.charge_limit) {
+            Ok(()) => {
+                log_msg(format!(
+                    "Установлен лимит зарядки батареи: {}",
+                    config.charge_limit
+                ));
+            }
+            Err(e) => {
+                log_msg(format!("Ошибка установки лимита зарядки: {}", e));
+            }
+        }
+    } else {
+        log_msg("Лимит заряда батареи: Выключен");
+    }
 
     loop {
         tokio::select! {
