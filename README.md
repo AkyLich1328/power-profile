@@ -8,7 +8,13 @@
 
 Если температура процессора > 85 или процент батареи < 25 - экономия энергии
 
-Конфиг файл находится в : /etc/power-profile/config.json
+И еще стандартно отключен лимит зарядки, для того что бы его включить нужно в конфиге поменять
+```
+enable_charge_limit: true,
+charge_limit: "Число при котором будет прекращаться зарядка, стандартно85",
+```
+
+Конфиг файл находится в : ```/etc/power-profile/config.json```
 
 <img width="1598" height="900" alt="image" src="https://github.com/user-attachments/assets/b8f745f1-f3cc-4eef-bccc-64abee753f70" />
 
