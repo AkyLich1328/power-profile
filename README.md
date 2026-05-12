@@ -4,4 +4,7 @@
 При работе от батареи - средняя производительность
 Если температура процессора > 85 или процент батареи < 25 - экономия энергии
 
-<img width="1600" height="884" alt="ss-20260509-112712" src="https://github.com/user-attachments/assets/18af7161-c6f2-4a86-a74e-6ecd61ccfb63" />
+Конфиг файл находится в : /etc/power-profile/config.json
+
+<img width="1594" height="900" alt="image" src="https://github.com/user-attachments/assets/4e459930-b65c-4df5-93a9-fbebcd2bf775" />
+
