@@ -15,6 +15,7 @@ sudo systemctl enable --now power-profiles-daemon
 ```
 
 Для автозапуска с системой нужно:
+
 перенести power-profile в /usr/local/bin/
 ```
 mv power-profile /usr/local/bin/
@@ -25,7 +26,6 @@ mv power-profile /usr/local/bin/
 sudo nano /etc/systemd/system/power-profile.service
 ```
 Вставляем в конфиг 
-/////////////
 ```
 [Unit]
 Description=Power Profile Manager (Rust)
