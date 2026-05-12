@@ -11,4 +11,5 @@
 Зависимости у программы:
 
 sudo pacman -S power-profiles-daemon
+
 sudo systemctl enable --now power-profiles-daemon
