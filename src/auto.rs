@@ -113,14 +113,14 @@ pub async fn auto_profile_worker() {
                         ),
                         //если батарея заряженна полностью
                         BatteryChargeStatus::Full => (
-                            BatteryPowerProfile::Performance,
+                            config.full_battery_profile,
                                 "Батарея заряженна полностью",
                         ),
                         //Если неисзвестно состояние батареи
                         //забавное наблюдение, когда стоит ограничение на зарядку 95%
                         //то когда батарея будет на этом уровне зарядки то будет Unknown
                         BatteryChargeStatus::Unknown => (
-                            BatteryPowerProfile::Balanced,
+                            config.unknown_profile,
                                 "Неизсветное состояние батареи",
                         ),
                     }
