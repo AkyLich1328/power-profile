@@ -32,6 +32,12 @@ sudo systemctl enable --now power-profiles-daemon
 mv power-profile /usr/local/bin/
 ```
 
+даем права на запуск
+
+```
+sudo chmod +x /usr/local/bin/power-profile
+```
+
 Дальше создаем systemd сервис
 ```
 sudo nano /etc/systemd/system/power-profile.service
