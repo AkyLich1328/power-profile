@@ -16,6 +16,11 @@ charge_limit: "Число при котором будет прекращать�
 
 Конфиг файл находится в : ```/etc/power-profile/config.json```
 
+"UPD"
+Была добавленна возможность отключения TurboBoost для экономии заряда батареи
+А так же смена яркости монитора в зависимости от профиля питания
+Все настраивается в конфиг файле
+
 <img width="1598" height="900" alt="image" src="https://github.com/user-attachments/assets/b8f745f1-f3cc-4eef-bccc-64abee753f70" />
 
 
