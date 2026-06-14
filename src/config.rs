@@ -8,12 +8,17 @@ pub struct Config {
     pub low_battery_threshold: u8, //процент батареи после которого идет экономия заряда
     pub high_temperature_threshold: f32, //температура после которой идет экономия заряда
     pub charging_profile: BatteryPowerProfile, //профиль питания при зарядке
-    pub full_battery_profile: BatteryPowerProfile, //профиль питания при полном заряде батареи
+    pub full_battery_profile: BatteryPowerProfile, //профиль питания при полной заряде батареи
     pub battery_profile: BatteryPowerProfile, //профиль при работе от батареи
     pub unknown_profile: BatteryPowerProfile, //профиль при неизвестном состоянии батареи(обычно
     //неизвестное состояние батареи тогда когда стоит лимит на зарядку и батарея заряженна на этом уровне
     pub enable_charge_limit: bool, //Установка лимита зарядки
     pub charge_limit: u8,          //процент после которого прекратится заряжаться батарея
+    pub disable_turbo_boost_intel: bool,
+    pub enable_brightness_control: bool,
+    pub brightness_power_saver: u8,
+    pub brightness_balanced: u8,
+    pub brightness_perfomance: u8,
 }
 
 impl Default for Config {
@@ -28,6 +33,11 @@ impl Default for Config {
             unknown_profile: BatteryPowerProfile::Balanced,
             enable_charge_limit: false,
             charge_limit: 85,
+            disable_turbo_boost_intel: false,
+            enable_brightness_control: true,
+            brightness_power_saver: 50,
+            brightness_balanced: 100,
+            brightness_perfomance: 100,
         }
     }
 }
