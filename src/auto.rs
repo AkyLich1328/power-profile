@@ -1,20 +1,21 @@
 use tokio::time::{Duration, sleep};
-
 use crate::battery::BatteryChargeStatus;
 use crate::battery::get_capacity;
 use crate::battery::get_status;
 use crate::battery::set_charge_limit;
 use crate::config::Config;
 use crate::config::load_or_create_config;
+use crate::dekstop;
 use crate::logging::log_msg;
 use crate::profiles::BatteryPowerProfile;
 use crate::profiles::get_profile;
 use crate::profiles::set_profile;
+use crate::thermal;
 use crate::thermal::find_cpu_temp_path;
 use crate::thermal::get_cpu_temperature;
 
 pub async fn auto_profile_worker() {
-    println!("Начало работы автоматической системы профилей батареи...");
+    log_msg("Начало работы автоматической системы профилей батареи...");
     //Получение температуры процессора по термальной зоне
     let cpu_temp_path = match find_cpu_temp_path() {
         Ok(path) => {
@@ -52,6 +53,23 @@ pub async fn auto_profile_worker() {
         }
     } else {
         log_msg("Лимит заряда батареи: Выключен");
+    }
+
+    match config.disable_turbo_boost_intel {
+        true => log_msg("Оключение TurboBoost: Включено"),
+        false => log_msg("Оключение TurboBoost: Выключено"),
+    }
+
+    match thermal::set_intel_turbo_bost(config.disable_turbo_boost_intel) {
+        Ok(s) => s,
+        Err(e) => {
+            log_msg(format!("Ошибка: {}", e));
+        }
+    }
+
+    match config.enable_brightness_control {
+        true => log_msg("Автоматический контроль яркости: Включен"),
+        false => log_msg("Автоматический контроль яркости: Выключен"),
     }
 
     loop {
@@ -121,7 +139,7 @@ pub async fn auto_profile_worker() {
                         //то когда батарея будет на этом уровне зарядки то будет Unknown
                         BatteryChargeStatus::Unknown => (
                             config.unknown_profile,
-                                "Неизсветное состояние батареи",
+                                "Неизвестное состояние батареи",
                         ),
                     }
                 };
@@ -154,6 +172,17 @@ pub async fn auto_profile_worker() {
 
                         Err(e) => {
                             log_msg(format!("Ошибка установки: {}", e));
+                        }
+                    }
+                    if config.enable_brightness_control {
+                        let brightness = match target_profile {
+                            BatteryPowerProfile::PowerSaver => config.brightness_power_saver,
+                            BatteryPowerProfile::Balanced => config.brightness_balanced,
+                            BatteryPowerProfile::Performance => config.brightness_perfomance,
+                        };
+
+                        if let Err(e) = dekstop::set_brightness(brightness).await {
+                            log_msg(format!("Ошибка смены яркости: {}", e));
                         }
                     }
                 }
