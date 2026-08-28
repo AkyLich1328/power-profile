@@ -24,6 +24,8 @@ charge_limit: "Число при котором будет прекращать�
 <img width="1598" height="900" alt="image" src="https://github.com/user-attachments/assets/b8f745f1-f3cc-4eef-bccc-64abee753f70" />
 
 
+ЕСЛИ У ВАС НЕ SYSTEMD ТО ДЕЛАЙТЕ АВТОЗАПУСК СЕРВИСА САМИ
+
 Зависимости у программы:
 ```
 sudo pacman -S power-profiles-daemon
